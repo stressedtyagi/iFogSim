@@ -55,11 +55,12 @@ public class Example_1 {
 
             createFogDevices(broker.getId(), appId);
 
-            for (FogDevice fogdevice:
-                 fogDevices) {
-                System.out.println(fogdevice.getId() + " : " + fogdevice.getName() + " --> " + fogdevice.getParentId() + " :: " + fogdevice.getChildrenIds() );
+            for (FogDevice fogdevice :
+                    fogDevices) {
+                System.out.println(fogdevice.getId() + " : " + fogdevice.getName() + " --> " + fogdevice.getParentId() + " :: " + fogdevice.getChildrenIds());
             }
-
+            MyFogDevice.initializeNeighbours((MyFogDevice) fogDevices.get(0));
+            MyFogDevice.showNetwork((MyFogDevice) fogDevices.get(0), 0);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -73,13 +74,21 @@ public class Example_1 {
         proxy.setParentId(cloud.getId()); // setting Cloud as parent of the Proxy Server
         proxy.setUplinkLatency(100); // latency of connection from Proxy Server to the Cloud is 100 ms
 
+        cloud.setChildrenIds(new ArrayList<Integer>() {{
+            add(proxy.getId());
+        }});
 
         fogDevices.add(cloud);
         fogDevices.add(proxy);
 
+        List<Integer> gateways = new ArrayList<>();
+
         for (int i = 0; i < numOfDepts; i++) {
-            addGw(i + "", proxy.getId()); // adding a fog device for every Gateway in physical topology. The parent of each gateway is the Proxy Server
+            FogDevice fogDevice = addGw(i + "", proxy.getId());
+            gateways.add(fogDevice.getId()); // adding a fog device for every Gateway in physical topology. The parent of each gateway is the Proxy Server
         }
+
+        proxy.setChildrenIds(gateways);
 
     }
 
@@ -88,6 +97,9 @@ public class Example_1 {
         fogDevices.add(dept);
         dept.setParentId(parentId);
         dept.setUplinkLatency(4); // latency of connection between gateways and proxy server is 4 ms
+
+        List<Integer> mobiles = new ArrayList<>();
+
         for (int i = 0; i < numOfMobilesPerDept; i++) {
             String mobileId = id + "-" + i;
             FogDevice mobile = createFogDevice("m-" + id, 1000, 1000, 10000, 270, 3, 0, 87.53, 82.44);
@@ -98,7 +110,12 @@ public class Example_1 {
 
             mobile.setUplinkLatency(2); // latency of connection between the smartphone and proxy server is 4 ms
             fogDevices.add(mobile);
+
+            mobiles.add(mobile.getId());
         }
+
+        dept.setChildrenIds(mobiles);
+
         return dept;
     }
 
