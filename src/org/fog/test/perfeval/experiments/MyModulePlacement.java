@@ -126,7 +126,9 @@ public class MyModulePlacement extends ModulePlacement {
     }
 
     private void placeModulesInPath(List<Integer> path) {
-        if (path.size() == 0) return;
+        if (path.size() == 0) {
+            return;
+        }
         List<String> placedModules = new ArrayList<String>();
         Map<AppEdge, Double> appEdgeToRate = new HashMap<AppEdge, Double>();
 
@@ -206,18 +208,31 @@ public class MyModulePlacement extends ModulePlacement {
                             }
                         }
 
-                        if (totalCpuLoad + getCurrentCpuLoad().get(deviceId) > device.getHost().getTotalMips() && validateGateway(device, moduleName, appEdgeToRate, totalCpuLoad, placedModules)) {
-                            Logger.debug("ModulePlacementEdgeward", "Need to shift module " + moduleName + " upstream from device " + device.getName());
-                            List<String> _placedOperators = shiftModuleNorth(moduleName, totalCpuLoad, deviceId, modulesToPlace);
-                            for (String placedOperator : _placedOperators) {
-                                if (!placedModules.contains(placedOperator))
-                                    placedModules.add(placedOperator);
+                        if (totalCpuLoad + getCurrentCpuLoad().get(deviceId) > device.getHost().getTotalMips()) {
+                            Integer siblingDeviceId = validateGateway(device, moduleName, totalCpuLoad);
+                            if (siblingDeviceId == -1) {
+                                Logger.debug("ModulePlacementEdgeward", "Need to shift module " + moduleName + " upstream from device " + device.getName());
+                                List<String> _placedOperators = shiftModuleNorth(moduleName, totalCpuLoad, deviceId, modulesToPlace);
+                                for (String placedOperator : _placedOperators) {
+                                    if (!placedModules.contains(placedOperator))
+                                        placedModules.add(placedOperator);
+                                }
+                            } else {
+                                FogDevice siblingDevice = (FogDevice) CloudSim.getEntity(siblingDeviceId);
+                                placedModules.add(moduleName);
+                                getCurrentCpuLoad().put(siblingDeviceId, getCurrentCpuLoad().get(siblingDeviceId) + totalCpuLoad);
+                                Map<String, Integer> test = getCurrentModuleInstanceNum().get(siblingDeviceId);
+
+                                getCurrentModuleInstanceNum().get(siblingDeviceId).put(moduleName, getCurrentModuleInstanceNum().get(siblingDeviceId).getOrDefault(moduleName, 0) + 1);
+                                Logger.debug("ModulePlacementEdgeward", "AppModule " + moduleName + " can be created on sibling device " + siblingDevice.getName());
+                                System.out.println("ModulePlacementEdgeward" + " AppModule " + moduleName + " can be created on sibling device " + siblingDevice.getName());
                             }
                         } else {
                             placedModules.add(moduleName);
                             getCurrentCpuLoad().put(deviceId, getCurrentCpuLoad().get(deviceId) + totalCpuLoad);
                             getCurrentModuleInstanceNum().get(deviceId).put(moduleName, getCurrentModuleInstanceNum().get(deviceId).get(moduleName) + 1);
                             Logger.debug("ModulePlacementEdgeward", "AppModule " + moduleName + " can be created on device " + device.getName());
+                            System.out.println("ModulePlacementEdgeward" + " AppModule " + moduleName + " can be created on device " + device.getName());
                         }
                     }
                 } else {
@@ -230,11 +245,36 @@ public class MyModulePlacement extends ModulePlacement {
                     }
 
                     if (totalCpuLoad + getCurrentCpuLoad().get(deviceId) > device.getHost().getTotalMips()) {
-                        Logger.debug("ModulePlacementEdgeward", "Placement of operator " + moduleName + "NOT POSSIBLE on device " + device.getName());
+                        Integer siblingDeviceId = validateGateway(device, moduleName, totalCpuLoad);
+                        if (siblingDeviceId == -1) {
+                            Logger.debug("ModulePlacementEdgeward", "Placement of operator " + moduleName + "NOT POSSIBLE on device " + device.getName());
+                            System.out.println("ModulePlacementEdgeward" + " Placement of operator " + moduleName + "NOT POSSIBLE on device " + device.getName());
+                        } else {
+                            FogDevice siblingDevice = (FogDevice) CloudSim.getEntity(siblingDeviceId);
+                            Logger.debug("ModulePlacementEdgeward", "Placement of operator " + moduleName + " on sibling device " + siblingDevice.getName() + " successful.");
+                            System.out.println("ModulePlacementEdgeward" + " Placement of operator " + moduleName + " on sibling device " + siblingDevice.getName() + " successful.");
+                            getCurrentCpuLoad().put(siblingDeviceId, totalCpuLoad + getCurrentCpuLoad().get(siblingDeviceId));
+
+                            if (!currentModuleMap.containsKey(siblingDeviceId))
+                                currentModuleMap.put(siblingDeviceId, new ArrayList<String>());
+                            currentModuleMap.get(siblingDeviceId).add(moduleName);
+                            placedModules.add(moduleName);
+                            modulesToPlace = getModulesToPlace(placedModules);
+                            getCurrentModuleLoadMap().get(siblingDeviceId).put(moduleName, totalCpuLoad);
+
+                            int max = 1;
+                            for (AppEdge edge : getApplication().getEdges()) {
+                                if (edge.getSource().equals(moduleName) && actuatorsAssociated.containsKey(edge.getDestination()))
+                                    max = Math.max(actuatorsAssociated.get(edge.getDestination()), max);
+                                if (edge.getDestination().equals(moduleName) && sensorsAssociated.containsKey(edge.getSource()))
+                                    max = Math.max(sensorsAssociated.get(edge.getSource()), max);
+                            }
+                            getCurrentModuleInstanceNum().get(siblingDeviceId).put(moduleName, max);
+                        }
                     } else {
                         Logger.debug("ModulePlacementEdgeward", "Placement of operator " + moduleName + " on device " + device.getName() + " successful.");
+                        System.out.println("ModulePlacementEdgeward" + " Placement of operator " + moduleName + " on device " + device.getName() + " successful.");
                         getCurrentCpuLoad().put(deviceId, totalCpuLoad + getCurrentCpuLoad().get(deviceId));
-                        System.out.println("Placement of operator " + moduleName + " on device " + device.getName() + " successful.");
 
                         if (!currentModuleMap.containsKey(deviceId))
                             currentModuleMap.put(deviceId, new ArrayList<String>());
@@ -265,38 +305,32 @@ public class MyModulePlacement extends ModulePlacement {
     /**
      * Validate Gateway
      *
-     * @param device
+     * @param currentDevice
      * @param moduleName
-     * @param modulesToPlace
-     * @return true/false
+     * @param totalCpuLoad
      */
-    private boolean validateGateway(FogDevice parentDevice, String moduleName, Map<AppEdge, Double> appEdgeToRate, double totalCpuLoad, List<String> placedModules) {
-        System.out.println("[Log] : Checking " + parentDevice.getName());
+    private Integer validateGateway(FogDevice currentDevice, String moduleName, double totalCpuLoad) {
+        int parentDeviceId = currentDevice.getParentId();
+        if (parentDeviceId == -1) {
+            Logger.debug("[Validate Gateway]", "No parent device present");
+            return -1;
+        }
+        FogDevice parentDevice = (FogDevice) CloudSim.getEntity(parentDeviceId);
         if (parentDevice.getName().startsWith("d")) {
-            System.out.println("[Validate Gateway] Gateway : " + " Device - " + parentDevice.getName() + ", ModuleName - " + moduleName);
+            Logger.debug("[Validate Gateway]", "Checking if any children of the gateway: " + parentDevice.getName() + " can place " + moduleName);
+
             List<Integer> children = parentDevice.getChildrenIds();
             for (Integer childId : children) {
-                MyFogDevice child = (MyFogDevice) CloudSim.getEntity(childId);
-                for (AppEdge edge : getApplication().getEdges()) {        // take all incoming edges
-                    if (edge.getDestination().equals(moduleName)) {
-                        double rate = appEdgeToRate.get(edge);
-                        totalCpuLoad += rate * edge.getTupleCpuLength();
-                    }
-                }
-                if (totalCpuLoad + getCurrentCpuLoad().get(childId) > child.getHost().getTotalMips()) {
-                    return true;
-                } else {
-                    System.out.println("[Validate Gateway] Else Part : " + " Device - " + child.getName() + ", ModuleName - " + moduleName);
-                    placedModules.add(moduleName);
-                    getCurrentCpuLoad().put(childId, getCurrentCpuLoad().get(childId) + totalCpuLoad);
-                    getCurrentModuleInstanceNum().get(childId).put(moduleName, getCurrentModuleInstanceNum().get(childId).get(moduleName) + 1);
-                    Logger.debug("ModulePlacementEdgeward", "AppModule " + moduleName + " can be created on device " + child.getName());
+                FogDevice child = (FogDevice) CloudSim.getEntity(childId);
+                if (totalCpuLoad + getCurrentCpuLoad().get(childId) < child.getHost().getTotalMips()) {
+                    return childId;
                 }
             }
         } else {
-            System.out.println("[Validate Gateway] Not Gateway : " + " Device - " + parentDevice.getName() + ", ModuleName - " + moduleName);
+            Logger.debug("[Validate Gateway]", "Current device: " + parentDevice.getName() + " is not a gateway");
+            return -1;
         }
-        return true;
+        return -1;
     }
 
     /**
