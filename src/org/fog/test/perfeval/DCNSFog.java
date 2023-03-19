@@ -30,6 +30,7 @@ import org.fog.placement.ModulePlacementEdgewards;
 import org.fog.placement.ModulePlacementMapping;
 import org.fog.policy.AppModuleAllocationPolicy;
 import org.fog.scheduler.StreamOperatorScheduler;
+import org.fog.test.perfeval.experiments.MyModulePlacement;
 import org.fog.utils.FogLinearPowerModel;
 import org.fog.utils.FogUtils;
 import org.fog.utils.TimeKeeper;
@@ -124,6 +125,7 @@ public class DCNSFog {
 	}
 
 	private static FogDevice addArea(String id, int userId, String appId, int parentId){
+//      FogDevice dept = createFogDevice("d-" + id, 1000, 4000, 10000, 10000, 1, 0.0, 107.339, 83.4333);
 		FogDevice router = createFogDevice("d-"+id, 2800, 4000, 10000, 10000, 1, 0.0, 107.339, 83.4333);
 		fogDevices.add(router);
 		router.setUplinkLatency(2); // latency of connection between router and proxy server is 2 ms
@@ -138,7 +140,10 @@ public class DCNSFog {
 	}
 	
 	private static FogDevice addCamera(String id, int userId, String appId, int parentId){
-		FogDevice camera = createFogDevice("m-"+id, 500, 1000, 10000, 10000, 3, 0, 87.53, 82.44);
+		Integer mips = Integer.parseInt(id.split("-")[1]) % 2 != 0 ? 2000 : 500;
+		System.out.println("[FogDevice] LOG : " + "m-" + id + " : " + mips);
+		FogDevice camera = createFogDevice("m-" + id, mips, 1000, 10000, 10000, 3, 0, 87.53, 82.44);
+//		FogDevice camera = createFogDevice("m-"+id, 500, 1000, 10000, 10000, 3, 0, 87.53, 82.44);
 		camera.setParentId(parentId);
 		Sensor sensor = new Sensor("s-"+id, "CAMERA", userId, appId, new DeterministicDistribution(5)); // inter-transmission time of camera (sensor) follows a deterministic distribution
 		sensors.add(sensor);

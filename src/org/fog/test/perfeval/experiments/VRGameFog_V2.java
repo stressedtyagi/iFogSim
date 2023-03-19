@@ -132,6 +132,7 @@ public class VRGameFog_V2 {
     }
 
     private static FogDevice addGw(String id, int userId, String appId, int parentId) {
+//      FogDevice dept = createFogDevice("d-" + id, 1000, 4000, 10000, 10000, 1, 0.0, 107.339, 83.4333);
         FogDevice dept = createFogDevice("d-" + id, 2800, 4000, 10000, 10000, 1, 0.0, 107.339, 83.4333);
         fogDevices.add(dept);
         dept.setParentId(parentId);
@@ -146,9 +147,10 @@ public class VRGameFog_V2 {
     }
 
     private static FogDevice addMobile(String id, int userId, String appId, int parentId) {
-//        Integer mips = Integer.parseInt(id.split("-")[1]) % 2 != 0 ? 10000000 : 500;
-//        System.out.println("[FogDevice] LOG : " + "m-" + id + " : " + mips);
-        FogDevice mobile = createFogDevice("m-" + id, 1000, 1000, 10000, 270, 3, 0, 87.53, 82.44);
+        Integer mips = Integer.parseInt(id.split("-")[1]) % 2 != 0 ? 2000 : 500;
+        System.out.println("[FogDevice] LOG : " + "m-" + id + " : " + mips);
+        FogDevice mobile = createFogDevice("m-" + id, mips, 1000, 10000, 270, 3, 0, 87.53, 82.44);
+//      FogDevice mobile = createFogDevice("m-"+id, 1000, 1000, 10000, 270, 3, 0, 87.53, 82.44);
         mobile.setParentId(parentId);
         Sensor eegSensor = new Sensor("s-" + id, "EEG", userId, appId, new DeterministicDistribution(EEG_TRANSMISSION_TIME)); // inter-transmission time of EEG sensor follows a deterministic distribution
         sensors.add(eegSensor);
