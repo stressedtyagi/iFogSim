@@ -16,6 +16,7 @@ import org.fog.application.selectivity.FractionalSelectivity;
 import org.fog.entities.*;
 import org.fog.placement.Controller;
 import org.fog.placement.ModuleMapping;
+import org.fog.placement.ModulePlacementEdgewards;
 import org.fog.placement.ModulePlacementMapping;
 import org.fog.policy.AppModuleAllocationPolicy;
 import org.fog.scheduler.StreamOperatorScheduler;
@@ -24,24 +25,21 @@ import org.fog.utils.FogUtils;
 import org.fog.utils.TimeKeeper;
 import org.fog.utils.distribution.DeterministicDistribution;
 
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
 /**
  * Simulation setup for case study 1 - EEG Beam Tractor Game
  *
  * @author Harshit Gupta
  */
-public class VRGameFog_V2 {
+public class VRGameFog_EWP {
     static List<FogDevice> fogDevices = new ArrayList<FogDevice>();
     static List<Sensor> sensors = new ArrayList<Sensor>();
     static List<Actuator> actuators = new ArrayList<Actuator>();
 
     static boolean CLOUD = false;
 
-    static int numOfDepts = 2;
+    static int numOfDepts = 5;
     static int numOfMobilesPerDept = 5;
     static double EEG_TRANSMISSION_TIME = 5;
 
@@ -94,7 +92,7 @@ public class VRGameFog_V2 {
 
             controller.submitApplication(application, 0,
                     (CLOUD) ? (new ModulePlacementMapping(fogDevices, application, moduleMapping))
-                            : (new MyModulePlacement(fogDevices, sensors, actuators, application, moduleMapping)));
+                            : (new ModulePlacementEdgewards(fogDevices, sensors, actuators, application, moduleMapping)));
 
             TimeKeeper.getInstance().setSimulationStartTime(Calendar.getInstance().getTimeInMillis());
 
@@ -132,7 +130,7 @@ public class VRGameFog_V2 {
     }
 
     private static FogDevice addGw(String id, int userId, String appId, int parentId) {
-//      FogDevice dept = createFogDevice("d-" + id, 1000, 4000, 10000, 10000, 1, 0.0, 107.339, 83.4333);
+//		FogDevice dept = createFogDevice("d-" + id, 1000, 4000, 10000, 10000, 1, 0.0, 107.339, 83.4333);
         FogDevice dept = createFogDevice("d-" + id, 2800, 4000, 10000, 10000, 1, 0.0, 107.339, 83.4333);
         fogDevices.add(dept);
         dept.setParentId(parentId);
@@ -147,10 +145,26 @@ public class VRGameFog_V2 {
     }
 
     private static FogDevice addMobile(String id, int userId, String appId, int parentId) {
-        Integer mips = Integer.parseInt(id.split("-")[1]) % 2 != 0 ? 2000 : 500;
-        System.out.println("[FogDevice] LOG : " + "m-" + id + " : " + mips);
-        FogDevice mobile = createFogDevice("m-" + id, mips, 1000, 10000, 270, 3, 0, 87.53, 82.44);
-//      FogDevice mobile = createFogDevice("m-"+id, 1000, 1000, 10000, 270, 3, 0, 87.53, 82.44);
+        Random random = new Random();
+        int CPU_MIN = 500;
+        int CPU_MAX = 2000;
+        int RAM_MIN = 500;
+        int RAM_MAX = 1000;
+        double IDLE_POWER_MIN = 82.44;
+        double IDLE_POWER_MAX = 103.34;
+
+        int mips = random.nextInt(CPU_MAX - CPU_MIN + 1) + CPU_MIN;
+        int ram = random.nextInt(RAM_MAX - RAM_MIN + 1) + RAM_MIN;
+        double randomDouble = new Random().nextDouble();
+        double idlePower = IDLE_POWER_MIN + ((IDLE_POWER_MAX - IDLE_POWER_MIN) * randomDouble);
+
+//        Integer mips = Integer.parseInt(id.split("-")[1]) % 2 != 0 ? 2000 : 500;
+
+        System.out.println("[FogDevice] LOG : " + "m-" + id + " :: CPU :" + mips + ", RAM : " + ram + ", Power : " + idlePower);
+
+        FogDevice mobile = createFogDevice("m-" + id, mips, ram, 10000, 270, 3, 0, 87.53, idlePower);
+
+//		FogDevice mobile = createFogDevice("m-"+id, 1000, 1000, 10000, 270, 3, 0, 87.53, 82.44);
         mobile.setParentId(parentId);
         Sensor eegSensor = new Sensor("s-" + id, "EEG", userId, appId, new DeterministicDistribution(EEG_TRANSMISSION_TIME)); // inter-transmission time of EEG sensor follows a deterministic distribution
         sensors.add(eegSensor);
@@ -218,9 +232,9 @@ public class VRGameFog_V2 {
                 arch, os, vmm, host, time_zone, cost, costPerMem,
                 costPerStorage, costPerBw);
 
-        MyFogDevice fogdevice = null;
+        FogDevice fogdevice = null;
         try {
-            fogdevice = new MyFogDevice(nodeName, characteristics,
+            fogdevice = new FogDevice(nodeName, characteristics,
                     new AppModuleAllocationPolicy(hostList), storageList, 10, upBw, downBw, 0, ratePerMips);
         } catch (Exception e) {
             e.printStackTrace();
